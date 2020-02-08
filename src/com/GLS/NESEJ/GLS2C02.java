@@ -1,13 +1,9 @@
 package com.GLS.NESEJ;
 
 import java.awt.Color;
-import java.util.Random;
 import java.util.AbstractMap.SimpleEntry;
-import java.util.Arrays;
 
 public class GLS2C02 {
-	
-	private Random rand;
 	
 	private Cartridge cart;
 	
@@ -31,7 +27,6 @@ public class GLS2C02 {
 	byte control; //ntx nty im ps pb ss sm en
 	
 	public GLS2C02() {
-		rand = new Random();
 		tblName = new byte[2][1024];
 		tblPalette = new byte[32];
 		tblPattern = new byte[2][4096]; //Javid Future

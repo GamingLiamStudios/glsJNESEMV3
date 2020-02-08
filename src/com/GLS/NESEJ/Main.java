@@ -119,7 +119,6 @@ public class Main extends Canvas implements KeyListener{
 	}
 
 	void drawCpu(int x, int y, Graphics g) {
-		String status = "STATUS: ";
 		drawString(x , y , "STATUS:", Color.WHITE,1,g);
 		drawString(x  + 64, y, "N", (nes.cpu.status & nes.cpu.N)!=0 ? Color.GREEN : Color.RED,1,g);
 		drawString(x  + 80, y , "V", (nes.cpu.status & nes.cpu.V)!=0 ? Color.GREEN : Color.RED,1,g);
