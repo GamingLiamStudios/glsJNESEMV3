@@ -97,6 +97,9 @@ public class Main extends Canvas implements KeyListener{
 		drawSprite(516,348,nes.ppu.getPatternTable(0, nSelectedPalette),1,g);
 		drawSprite(648,348,nes.ppu.getPatternTable(1, nSelectedPalette),1,g);
 		drawSprite(0, 0, nes.ppu.getScreen(), 2, g);
+		for(int y = 0; y < 30; y++)
+			for(int x = 0; x < 32; x++)
+				drawString(x*16,y*16,hex(nes.ppu.tblName[0][y*32+x]&0xFF,2),Color.white,1,g);
 		g.dispose();
 		bs.show();
 	}

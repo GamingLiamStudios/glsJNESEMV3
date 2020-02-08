@@ -11,7 +11,7 @@ public class GLS2C02 {
 	
 	private Cartridge cart;
 	
-	private byte[][] tblName;
+	public byte[][] tblName;
 	private byte[] tblPalette;
 	private byte[][] tblPattern;
 	
@@ -24,7 +24,7 @@ public class GLS2C02 {
 	
 	private int scanline = 0, cycle = 0;
 	
-	public boolean frame_complete = false;
+	public boolean frame_complete = false, nmi = false;
 	
 	byte status; //unused:1-5 sprite_overflow:6 sprite_zero_hit:7 vertical blank:8
 	byte mask; //gs rbl rsl rb rs er eg eb
@@ -117,10 +117,12 @@ public class GLS2C02 {
 			cycle = 1;
 		if (scanline == -1 && cycle == 1)
 			status = setRegister(status,(byte)0x80,false);
-		if (scanline >= 241 && scanline < 261)
-			if (scanline == 241 && cycle == 1)
-				status = setRegister(status,(byte)0x80,true);
-		sprScreen.setPixel(cycle-1, scanline, palScreen[rand.nextBoolean()?0x3F:0x30]);
+		if (scanline == 241 && cycle == 1) {
+			status = setRegister(status,(byte)0x80,true);
+			if(getRegister(control,(byte)0x80))
+				nmi = true;
+		}
+		//sprScreen.setPixel(cycle-1, scanline, palScreen[rand.nextBoolean()?0x3F:0x30]);
 		cycle++;
 		if(cycle>=341) {
 			cycle = 0;
@@ -141,22 +143,21 @@ public class GLS2C02 {
 	}
 	
 	public Sprite getPatternTable(int i, byte palette) {
-		for(int nTileY = 0; nTileY < 16; nTileY++) {
-			for(int nTileX = 0; nTileX < 16; nTileX++) {
-				int nOffset = nTileY*256+nTileX*16;
-				for(int row = 0; row < 8; row++) {
-					byte tile_lsb = ppuRead((short)(i*0x1000+nOffset+row));
-					byte tile_msb = ppuRead((short)(i*0x1000+nOffset+row+0x0008));
-					for(int col = 0; col < 8; col++) {
-						byte pixel = (byte)((tile_lsb&0x01)+(tile_msb&0x01));
-						tile_lsb>>>=1;
-						tile_msb>>>=1;
-						sprPatternTable[i].setPixel(nTileX*8+(7-col), nTileY*8+row,
-								getColourFromPaletteRam(palette, pixel));
-					}	
-				}		
+		for (short nTileY = 0; nTileY < 16; nTileY++){
+			for (short nTileX = 0; nTileX < 16; nTileX++){
+				short nOffset = (short) ((nTileY * 256) + (nTileX * 16));
+				for (short row = 0; row < 8; row++){
+					byte tile_lsb = ppuRead((short) ((i * 0x1000) + nOffset + row + 0x0000));
+					byte tile_msb = ppuRead((short) ((i * 0x1000) + nOffset + row + 0x0008));
+					for (short col = 0; col < 8; col++){
+						byte pixel = (byte) ((tile_lsb & 0x01) + (tile_msb & 0x01));
+						tile_lsb >>>= 1; tile_msb >>>= 1;
+						sprPatternTable[i].setPixel(nTileX * 8 + (7 - col),nTileY * 8 + row, 
+							getColourFromPaletteRam(palette, pixel));
+					}
+				}
 			}
-		}		
+		}	
 		return sprPatternTable[i];
 	}
 	
@@ -190,6 +191,7 @@ public class GLS2C02 {
 			break;
 		case 7: // PPU Data
 			ppuWrite(ppu_address,data);
+			ppu_address++;
 			break;
 		}
 	}
@@ -242,6 +244,7 @@ public class GLS2C02 {
 				data = ppu_data_buffer;
 				ppu_data_buffer = ppuRead(ppu_address);
 				if(ppu_address>0x3F00) data = ppu_data_buffer;
+				ppu_address++;
 				break;
 			}
 		}
@@ -249,14 +252,32 @@ public class GLS2C02 {
 	}
 	
 	public void ppuWrite(short saddr, byte data) {
-		saddr&=0x3FFF;
-		int addr = saddr&0xFFFF;
-		if(cart.ppuWrite(saddr, data)) {
+		int addr = saddr&0x3FFF;
+		if(cart.ppuWrite((short)addr, data)) {
 			
 		} else if(addr>=0x0000&&addr<=0x1FFF) {
 			tblPattern[(addr&0x1000)>>12][addr&0x0FFF] = data;
 		} else if(addr>=0x2000&&addr<=0x3EFF) {
-			
+			addr &= 0x0FFF;
+			if (cart.mirror) {
+				if (addr >= 0x0000 && addr <= 0x03FF)
+					tblName[0][addr & 0x03FF] = data;
+				if (addr >= 0x0400 && addr <= 0x07FF)
+					tblName[1][addr & 0x03FF] = data;
+				if (addr >= 0x0800 && addr <= 0x0BFF)
+					tblName[0][addr & 0x03FF] = data;
+				if (addr >= 0x0C00 && addr <= 0x0FFF)
+					tblName[1][addr & 0x03FF] = data;
+			} else {
+				if (addr >= 0x0000 && addr <= 0x03FF)
+					tblName[0][addr & 0x03FF] = data;
+				if (addr >= 0x0400 && addr <= 0x07FF)
+					tblName[0][addr & 0x03FF] = data;
+				if (addr >= 0x0800 && addr <= 0x0BFF)
+					tblName[1][addr & 0x03FF] = data;
+				if (addr >= 0x0C00 && addr <= 0x0FFF)
+					tblName[1][addr & 0x03FF] = data;
+			}
 		} else if(addr>=0x3F00&&addr<=0x3FFF) {
 			addr&=0x001F;
 			if(addr==0x10) addr = 0x0;
@@ -268,29 +289,47 @@ public class GLS2C02 {
 	}
 	
 	public byte ppuRead(short saddr) {
-		saddr&=0x3FFF;
-		int addr = saddr&0xFFFF;
-		byte data = 0x00;
-		SimpleEntry<Boolean, Byte> cartr = cart.ppuRead(saddr);
+		int addr = saddr&0x3FFF;
+		byte data = 0x30;
+		SimpleEntry<Boolean, Byte> cartr = cart.ppuRead((short)addr);
 		if(cartr.getKey()) {
 			data = cartr.getValue();
 		} else if(addr>=0x0000&&addr<=0x1FFF) {
 			data = tblPattern[(addr&0x1000)>>12][addr&0x0FFF];
 		} else if(addr>=0x2000&&addr<=0x3EFF) {
-			
+			addr &= 0x0FFF;
+			if (cart.mirror) {
+				if (addr >= 0x0000 && addr <= 0x03FF)
+					data = tblName[0][addr & 0x03FF];
+				if (addr >= 0x0400 && addr <= 0x07FF)
+					data = tblName[1][addr & 0x03FF];
+				if (addr >= 0x0800 && addr <= 0x0BFF)
+					data = tblName[0][addr & 0x03FF];
+				if (addr >= 0x0C00 && addr <= 0x0FFF)
+					data = tblName[1][addr & 0x03FF];
+			} else {
+				if (addr >= 0x0000 && addr <= 0x03FF)
+					data = tblName[0][addr & 0x03FF];
+				if (addr >= 0x0400 && addr <= 0x07FF)
+					data = tblName[0][addr & 0x03FF];
+				if (addr >= 0x0800 && addr <= 0x0BFF)
+					data = tblName[1][addr & 0x03FF];
+				if (addr >= 0x0C00 && addr <= 0x0FFF)
+					data = tblName[1][addr & 0x03FF];
+			}
 		} else if(addr>=0x3F00&&addr<=0x3FFF) {
-			addr&=0x001F;
-			if(addr==0x0010) addr = 0x0000;
-			if(addr==0x0014) addr = 0x0004;
-			if(addr==0x0018) addr = 0x0008;
-			if(addr==0x001C) addr = 0x000C;
+			addr &= 0x001F;
+			if (addr == 0x0010) addr = 0x0000;
+			if (addr == 0x0014) addr = 0x0004;
+			if (addr == 0x0018) addr = 0x0008;
+			if (addr == 0x001C) addr = 0x000C;
 			data = tblPalette[addr];
 		}
 		return data;
 	}
 
-	private byte getRegister(byte reg, byte bit) {
-		return (byte) (((reg&bit)!=0)?1:0);
+	private boolean getRegister(byte reg, byte bit) {
+		return ((reg&bit)!=0);
 	}
 	
 	private byte setRegister(byte creg, byte bit, boolean val) {

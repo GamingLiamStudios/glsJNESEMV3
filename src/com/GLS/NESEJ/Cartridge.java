@@ -14,7 +14,7 @@ public class Cartridge {
 	private byte nMapperID = 0, nPRGBanks = 0, nCHRBanks = 0;
 	private Mapper mapper;
 	
-	public boolean imageValid = false;
+	public boolean imageValid = false, mirror;
 	
 	/* HEADER
 	char name[4]; 0-3
@@ -35,6 +35,7 @@ public class Cartridge {
 			i.read(header);
 			if((header[6]&0x04)!=0) i.skip(512);
 			nMapperID = (byte) ((((header[7]&0xFF)>>4)<<4)|((header[6]&0xFF)>>4));
+			mirror = (header[6]&0x01)!=0;
 			int nFileType = 1;
 			if(nFileType==0) {
 				

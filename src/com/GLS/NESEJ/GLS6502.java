@@ -649,7 +649,7 @@ public class GLS6502 {
 
 	public byte ROR() {
 		fetch();
-		temp = (short) (((short)(getFlag(C) << 7) | (fetched >> 1))&0xFF);
+		temp = (short) (((short)(getFlag(C) << 7) | ((fetched&0xFF) >> 1))&0xFF);
 		setFlag(C, (fetched & 0x01)!=0);
 		setFlag(Z, (temp & 0x00FF) == 0x00);
 		setFlag(N, (temp & 0x0080)!=0);
